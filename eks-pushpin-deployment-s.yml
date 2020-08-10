@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pushpin-config
+data:
+  routes: |
+    * test
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushpin-dep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pushpin
+  template:
+    metadata:
+      labels:
+        app: pushpin
+    spec:
+      containers:
+      - name: pushpin
+        image: fanout/pushpin
+        ports:
+        - containerPort: 7999
+        - containerPort: 5560
+        - containerPort: 5561
+        - containerPort: 5562
+        volumeMounts:
+        - name: pushpin-config
+          mountPath: /etc/pushpin/routes
+          subPath: routes
+      - name: kafka-app
+        image: nnallapu/zeromq:1.2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+      - name:  kafka
+        image: spotify/kafka
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 2181
+        - containerPort: 9092
+      volumes:
+      - name: pushpin-config
+        configMap:
+          name: pushpin-config  
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushpin-svc
+spec:
+  ports:
+  - name: http
+    port: 5561
+    protocol: TCP
+    targetPort: 5561
+  selector:
+    app: pushpin
+  sessionAffinity: None
+  type: ClusterIP
